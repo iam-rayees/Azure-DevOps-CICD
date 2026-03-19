@@ -1,0 +1,44 @@
+- stage: BuildingJavaCodeWithMavenCopyToJFrog
+  condition: and(succeeded(), eq(variables.isDev, true))
+  #condition: always()
+  pool:
+    name: AzureAgentPool
+    demands:
+      - Terraform -equals Yes
+  jobs:
+    - job: BuildingJavaCodeJob
+      timeoutInMinutes: 5
+      steps:
+        - script: ls -al && pwd && rm -rf /home/adminRay/.m2/settings.xml
+          displayName: "List Files & Current Working Directory"
+        - task: DownloadSecureFile@1
+          inputs:
+            secureFile: "settings.xml"
+        - task: CopyFiles@2
+          inputs:
+            SourceFolder: "$(Agent.TempDirectory)"
+            Contents: "**"
+            TargetFolder: "/home/adminRay/.m2"
+        - script: mvn versions:set -DnewVersion=Dev-2.0.$(Build.BuildId)
+          displayName: "Set Maven Build Version"
+        - script: mvn clean package install && ls -al
+          displayName: "Run the maven build and install"
+        - script: mvn deploy && ls -al
+          displayName: "Run the maven deploy"
+          continueOnError: true
+        - script: ls -al && cp /home/adminRay/myagent/_work/1/s/target/ado-spring-boot-app-dev-Dev-2.0.$(Build.BuildId).jar ROOT$(Build.BuildId).jar && ls -al
+          displayName: "List Files & Rename ROOT.jar"
+        - script: rm -rf /artifacts/*.jar && cp ROOT$(Build.BuildId).jar /artifacts && ls -al /artifacts
+          displayName: "Copy Artifact To Folder"
+        - task: CopyFiles@2
+          inputs:
+            Contents: "ROOT$(Build.BuildId).jar"
+            TargetFolder: "$(Build.ArtifactStagingDirectory)"
+            OverWrite: true
+          displayName: "Copying JAR file to ArtifactStagingDirector"
+        - task: PublishBuildArtifacts@1
+          inputs:
+            PathtoPublish: "$(Build.ArtifactStagingDirectory)"
+            ArtifactName: "ROOT$(Build.BuildId).jar"
+            publishLocation: "Container"
+          displayName: "Publishing JAR Artifact."

@@ -1,0 +1,21 @@
+trigger:
+  - development
+  - uat
+  - production
+
+pool:
+  name: AzureAgentPool
+  demands:
+    - Java -equals Yes
+    - Terraform -equals Yes
+    - Agent.Name -equals ProdADO
+variables:
+  global_version: "1.0.0"
+  global_email: "rayees.mohd@gmail.com"
+  # azure_dev_sub: "1e9d13b0-73fc-43eb-b04e-4b4f5a5ea96f"
+  isDev: $[eq(variables['Build.SourceBranch'], 'refs/heads/development')]
+  isProd: $[eq(variables['Build.SourceBranch'], 'refs/heads/production')]
+
+steps:
+  - script: docker version && packer version && terraform version && aws --version && java -version && mvn --version
+    displayName: "Testing A Newly Created Agent and pools"

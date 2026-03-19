@@ -1,0 +1,22 @@
+  - stage: DeployDockerImageToAzureACI
+    condition: and(succeeded(), eq(variables.isDev, true))
+    pool:
+      name: AzureAgentPool
+      demands:
+        - JDK -equals 17
+    jobs:
+      - job: DeployAzureACI
+        timeoutInMinutes: 15
+        steps:
+          - checkout: none
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: "rayeez-subscription"
+              scriptType: "bash"
+              scriptLocation: "inlineScript"
+              inlineScript: "az container create -g ProdADO_group --name devsecopsado$(Build.BuildId) --image devsecopsacrtest.azurecr.io/devsecopsacrtest:$(Build.BuildId) --cpu 2 --memory 4 --ports 8080 --dns-name-label devsecopsado$(Build.BuildId) --registry-username devsecopsacrtest --registry-password $(acrpassword) --location eastus --os-type Linux"
+            displayName: "Deploy Docker Image to Azure Container Instances"
+            continueOnError: true
+
+
+

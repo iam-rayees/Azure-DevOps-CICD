@@ -1,0 +1,16 @@
+  - stage: CopyingArtifactsToAzureAndAws
+    condition: and(succeeded(), eq(variables.isDev, true))
+    jobs:
+      - job: CopyFilesToAzureBlob
+        timeoutInMinutes: 5
+        steps:
+          - checkout: none
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: "rayeez-subscription"
+              scriptType: "bash"
+              scriptLocation: "inlineScript"
+              inlineScript: |
+                az storage blob upload-batch --account-name rayeezsecopsprod  --account-key $(STORAGE_ACCOUNT_KEY) --destination artifacts --source /artifacts/
+            displayName: "Azure Upload artifacts to Azure Blob"
+            continueOnError: true

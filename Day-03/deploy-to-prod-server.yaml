@@ -1,0 +1,30 @@
+  - stage: "DeployingToProdEnvironment"
+    dependsOn: BuildingJavaCodeWithMavenCopyToJFrog
+    condition: and(succeeded('BuildingJavaCodeWithMavenCopyToJFrog'), eq(variables.isProd, true))
+    pool:
+      name: AzureAgentPool
+    displayName: "Deploying To AWS Prod Environment"
+    jobs:
+      - deployment: "DeployJARtoProdServer"
+        environment:
+          name: PROD
+          resourceType: VirtualMachine
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: |
+                    PROC=$(ps -ef | grep -i jar | grep -v grep | awk '{print $2}')
+                    if [ -n "$PROC" ]; then
+                      echo "Stopping process with PID: $PROC"
+                      sudo kill -9 $PROC || echo "Failed to stop process."
+                    else
+                      echo "No JAR process found. Nothing to stop."
+                    fi
+                  displayName: "Stop Existing JAR File"
+                  continueOnError: true
+                - script: |
+                    sudo java -jar /home/ubuntu/azagent/_work/1/ROOT$(Build.BuildId).jar/ROOT$(Build.BuildId).jar &
+                    echo "Application started successfully"
+                  displayName: "Running The Jar File"
+                  continueOnError: true

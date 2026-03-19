@@ -1,0 +1,16 @@
+---
+- job: CopyFilesToAWSS3Bucket
+  dependsOn: CopyFilesToAzureBlob
+  condition: always() # succeededOrFailed() or always() or failed() or succeeded()-default
+  timeoutInMinutes: 10
+  steps:
+    - checkout: none
+    - task: S3Upload@1
+      inputs:
+        awsCredentials: "rayeezsecops-s3"
+        regionName: "us-east-1"
+        bucketName: "rayeezsecopss3uploadprodartifacts"
+        sourceFolder: "/artifacts/"
+        globExpressions: "ROOT$(Build.BuildId).jar"
+      displayName: "AWS Upload artifacts to AWS S3 Bucket"
+      continueOnError: true

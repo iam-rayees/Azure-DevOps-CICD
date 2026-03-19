@@ -1,0 +1,140 @@
+sudo apt update && sudo apt install -y openjdk-17-jdk
+
+create record under route53 - jfrog.cloudrayeez.xyz
+
+java -version
+
+sudo apt install -y maven  # java is the dependency for maven 
+
+git clone https://github.com/spring-projects/spring-petclinic.git  # In Local laptop
+
+create a azure devops repo on azure portal and push the spring boot app files to it 
+
+git remote add origin https://mohdrayees3214@dev.azure.com/mohdrayees3214/maven-jfrog/_git/my-maven-proj
+
+git push origin master
+
+Now make authentication between EC2 machine and this azure devops repo using rsa public key
+
+as root user run ssh-keyhen -t rsa in EC2 machine and copy public key
+
+paste this key in azure devops ssh public key section at right top
+
+Now copy the ssh type git clone link of azure devops repo and clone it in ec2 machine 
+
+Now check if changes made in azure devops repo are reflecting in ec2 machine after git pull
+
+add ## testing azure devops repo at last to README.md file
+
+push this change to azure devops repo
+
+now apply git pull in EC2 machine and then check last line of README.ms file
+
+tail -5 README.md 
+
+Concept: on compiling files will change to .java then to .class and then to .ear, or .war, or .jar file (artifacts)
+
+Now run "mvn validate" in EC2 machine, it will check the pom.xml file and install all the dependencies.
+
+Now run "mvn compile"
+
+java -jar target/*.jar   ---->   It gives error that unable to access, because we haven't pakaged it 
+
+now run mvn package
+
+now we can run previous command
+
+Now access the application on browser -  jfrog.cloudrayeez.xyz:8080
+
+Now copy a cute dog image from internet and save it on place of current dog image in application 
+
+Now from EC2 machine, pull the recent changes -  git pull
+
+run command: mvn clean - to remove previous artifact and proced with latest updates 
+
+mvn clean
+
+mvn clean package
+
+Now again run: java -jar target/*.jar
+
+Now write Hiee! in place of welcome in html file under templates
+
+push the new changes from local, pull it on ec2 machine 
+
+Now run: mvn clean package install then run: java -jar target/*.jar
+
+A copy of artifacts generated is present on /root/.m2 location
+
+cd repository , ls -al
+
+It is expected to have change in version when we are building application with new changes in code.
+
+Add the plugin block as shown , push the code to azure devops repo and git pull at ec2 machine.
+
+then run:
+mvn versions:set -DnewVersion=1.0.0
+
+mvn versions:set -DnewVersion=1.0.2
+
+mvn versions:set -DnewVersion=1.0.3 
+
+This generates artifacts with respective version of the application 
+
+Now install the jfrog at /usr/local/bin location:
+wget -O jfrog-deb-installer.tar.gz "https://releases.jfrog.io/artifactory/jfrog-prox/org/artifactory/pro/deb/jfrog-platform-trial-prox/[RELEASE]/jfrog-platform-trial-prox-[RELEASE]-deb.tar.gz"
+
+tar -zxvf jfrog-deb-installer.tar.gz
+
+cd jfrog-platform-trial-prox-7.133.12-deb/
+
+sudo apt install -y jq && apt install -y net-tools   # dependencies for jfrog
+
+sudo ./install.sh
+
+sudo systemctl start artifactory.service
+
+sudo systemctl start xray.service
+
+# JFROG username: XXXXXXXXXXXX 
+# JFROG password: YYYYYY
+
+Now access jfrog server: http://jfrog.cloudrayeez.xyz:8082/
+
+configure the jfrog server with the license key generated from 14 days trail provided by jfrg site.
+
+under artifacts, on jforg server go to set up tab and select maven. give your password and generate the token  
+
+Now generate the setting.xml on jfrog server , copy and paste it in springboot application and make following changes 
+
+change username= admin 
+password = Ray@YYYY
+
+enable = true (in place of false)
+
+jfrog.cloudrayeez.xyz:8082 (in pace of jfrog.cloudrayeez.xyz)
+
+Now go to pom.xml file and comment out nohttp-checkstyle-validation executions block 
+and add distributionManagement block 
+
+on ec2 machine, go to /root/.m2 directory and nano settings.xml file and paste the settings.xml from vs code.
+
+push changes to azure devops repository and git pull on EC2 machine:
+rm -rf pom.xml.versionsBackup
+git restore pom.xml
+git pull
+
+mvn clean install
+mvn deploy
+
+Now artifacts are found on Jfrog repository
+
+mvn versions:set -DnewVersion=1.0.0
+mvn clean install && mvn deploy
+
+mvn versions:set -DnewVersion=1.2.0
+mvn clean install && mvn deploy
+
+mvn versions:set -DnewVersion=1.3.0
+mvn clean install && mvn deploy
+

@@ -1,0 +1,34 @@
+  - stage: BuildDockerImagePushToAzureACRAndDockerHub
+    condition: and(succeeded(), eq(variables.isDev, true))
+    jobs:
+      - job: PushToAzureACR
+        condition: always() # succeededOrFailed() or always() or failed()
+        timeoutInMinutes: 15
+        steps:
+          - checkout: none
+          - task: Bash@3
+            inputs:
+              targetType: "inline"
+              script: |
+                docker login -u devsecopsacrtest -p $(acrpassword) devsecopsacrtest.azurecr.io
+                docker tag rayeez/myapp:$(Build.BuildId) devsecopsacrtest.azurecr.io/devsecopsacrtest:$(Build.BuildId)
+                docker push devsecopsacrtest.azurecr.io/devsecopsacrtest:$(Build.BuildId)
+            displayName: "Creating & Pushing Docker Image To Azure ACR"
+      - job: PushToDockerHub
+        dependsOn: PushToAzureACR
+        condition: always() # succeededOrFailed() or always() or failed()
+        timeoutInMinutes: 5
+        steps:
+          - checkout: none
+          - task: Docker@2
+            inputs:
+              containerRegistry: "devops-dockerhub-connection"
+              command: "login"
+            displayName: "Login To Docker Hub"
+          - task: Bash@3
+            inputs:
+              targetType: "inline"
+              script: |
+                docker tag rayeez/myapp:$(Build.BuildId) rayeez/devsecopsado:$(Build.BuildId)
+                docker push rayeez/devsecopsado:$(Build.BuildId)
+            displayName: "Pushing Docker Image To Docker Hub"

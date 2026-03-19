@@ -1,0 +1,49 @@
+  - stage: "DeployingToStagingEnvironment"
+    dependsOn: BuildingJavaCodeWithMavenCopyToJFrog
+    condition: and(succeeded(), eq(variables.isDev, true))
+    pool:
+      name: AzureAgentPool
+    displayName: "Deploying To AWS Staging Environment"
+    jobs:
+      - deployment: "DeployJARtoStagingServer"
+        environment:
+          name: STAGING
+          resourceType: VirtualMachine
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: |
+                    PROC=$(ps -ef | grep -i jar | grep -v grep | awk '{print $2}')
+                    if [ -n "$PROC" ]; then
+                      echo "Stopping process with PID: $PROC"
+                      sudo kill -9 $PROC || echo "Failed to stop process."
+                    else
+                      echo "No JAR process found. Nothing to stop."
+                    fi
+                    exit 0  # Force success status
+                  displayName: "Stop Existing JAR File"
+                - script: |
+                    sudo java -jar /home/ubuntu/azagent/_work/1/ROOT$(Build.BuildId).jar/ROOT$(Build.BuildId).jar &
+                    echo "Application started successfully."
+                    exit 0  # Force success status
+                  displayName: "Running The Jar File"
+  - stage: ZAPOWASPTestingStagingEnvironment
+    condition: and(succeeded(), eq(variables.isDev, true))
+    jobs:
+      - job: ZapTestingStaging
+        timeoutInMinutes: 20
+        steps:
+          - checkout: none
+        # Pull the OWASP ZAP image and run the baseline scan
+          - script: |
+              docker pull ghcr.io/zaproxy/zaproxy:stable
+              docker run -u 0 -v $(Pipeline.Workspace)/owaspzap:/zap/wrk/:rw ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t http://staging.cloudrayeez.xyz:8080/ -J report.json -r report.html -I -i
+            displayName: "DAST Staging Environment"
+            continueOnError: true
+        # Publish the ZAP test results
+          - task: PublishTestResults@2
+            displayName: "Publish Test Results For ZAP Testing"
+            inputs:
+              testResultsFormat: "NUnit"
+              testResultsFiles: "$(Pipeline.Workspace)/owaspzap/report.html"
