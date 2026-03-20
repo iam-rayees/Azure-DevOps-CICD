@@ -1,8 +1,3 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
   branches:
     include:
@@ -11,23 +6,22 @@ trigger:
       - production
     exclude: ["master", "feature*", "README.md"]
 pool:
-  name: AzureAgentPool
+  name: MicroSoftAgent
   demands:
     - Java -equals Yes
     - Terraform -equals Yes
     - Agent.Name -equals ProdADO
 variables:
   global_version: "1.0.0"
-  global_email: "rayeesmohd@gmail.com"
+  global_email: "rayees.mohd@gmail.com"
   # azure_dev_sub: "1e9d13b0-73fc-43eb-b04e-4b4f5a5ea96f"
   isDev: $[eq(variables['Build.SourceBranch'], 'refs/heads/development')]
   isProd: $[eq(variables['Build.SourceBranch'], 'refs/heads/production')]
-
 stages:
   - stage: CheckingADOAgentStatus
     condition: or(eq(variables.isProd, true), eq(variables.isDev, true))
     pool:
-      name: AzureAgentPool
+      name: MicroSoftAgent
       demands:
         - Terraform -equals Yes
     variables:
@@ -52,7 +46,7 @@ stages:
     condition: and(succeeded(), or(eq(variables.isProd, 'true'), eq(variables.isDev, 'true')))
     # condition: and(succeeded(), eq(variables.isDev, true))
     pool:
-      name: AzureAgentPool
+      name: MicroSoftAgent
       demands:
         - JDK -equals 17
     jobs:
@@ -66,7 +60,7 @@ stages:
             displayName: "Create Override Global Settings"
           - task: SonarQubePrepare@7
             inputs:
-              SonarQube: "SonarTestToken"
+              SonarQube: "SonarTestToken" # Service Connection
               scannerMode: "Other"
               projectVersion: "$(Build.BuildId)"
             displayName: "Preparing SonarQube Config"
@@ -90,12 +84,12 @@ stages:
     # condition: and(succeeded(), eq(variables.isDev, true))
     #condition: always()
     pool:
-      name: AzureAgentPool
+      name: MicroSoftAgent
       demands:
         - Terraform -equals Yes
     jobs:
       - job: BuildingJavaCodeJob
-        timeoutInMinutes: 35
+        timeoutInMinutes: 20
         steps:
           - script: ls -al && pwd && rm -rf /home/adminRay/.m2/settings.xml
             displayName: "List Files & Current Working Directory"
@@ -107,16 +101,14 @@ stages:
               SourceFolder: "$(Agent.TempDirectory)"
               Contents: "**"
               TargetFolder: "/home/adminRay/.m2"
-          - script: |
-              echo '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" />' > $(Agent.TempDirectory)/global-settings.xml
-              mvn versions:set -DnewVersion=Dev-2.0.$(Build.BuildId) -gs $(Agent.TempDirectory)/global-settings.xml
+          - script: mvn versions:set -DnewVersion=Dev-3.3.$(Build.BuildId) -gs /home/adminRay/.m2/settings.xml
             displayName: "Set Maven Build Version"
-          - script: mvn clean package install -gs $(Agent.TempDirectory)/global-settings.xml && ls -al
+          - script: mvn clean package install -gs /home/adminRay/.m2/settings.xml && ls -al target
             displayName: "Run the maven build and install"
-          - script: mvn deploy -gs $(Agent.TempDirectory)/global-settings.xml && ls -al
+          - script: mvn deploy -gs /home/adminRay/.m2/settings.xml && ls -al target
             displayName: "Run the maven deploy"
             continueOnError: true
-          - script: ls -al && cp /home/adminRay/myagent/_work/1/s/target/ado-spring-boot-app-dev-Dev-2.0.$(Build.BuildId).jar ROOT$(Build.BuildId).jar && ls -al
+          - script: ls -al && cp /home/adminRay/myagent/_work/1/s/target/ado-spring-boot-app-dev-Dev-3.3.$(Build.BuildId).jar ROOT$(Build.BuildId).jar && ls -al
             displayName: "List Files & Rename ROOT.jar"
           - script: rm -rf /artifacts/*.jar && cp ROOT$(Build.BuildId).jar /artifacts && ls -al /artifacts
             displayName: "Copy Artifact To Folder"
@@ -125,14 +117,14 @@ stages:
               Contents: "ROOT$(Build.BuildId).jar"
               TargetFolder: "$(Build.ArtifactStagingDirectory)"
               OverWrite: true
-            displayName: "Copying JAR file to ArtifactStagingDirector"
+            displayName: "Copying JAR file to ArtifactStagingDirectory"
           - task: PublishBuildArtifacts@1
             inputs:
               PathtoPublish: "$(Build.ArtifactStagingDirectory)"
               ArtifactName: "ROOT$(Build.BuildId).jar"
               publishLocation: "Container"
             displayName: "Publishing JAR Artifact."
-  - stage: CopyingArtifactsToAzureAndAws
+  - stage: CopyingArtifactsToAzureBlobAndAwsS3
     condition: and(succeeded(), eq(variables.isDev, true))
     jobs:
       - job: CopyFilesToAzureBlob
@@ -141,7 +133,7 @@ stages:
           - checkout: none
           - task: AzureCLI@2
             inputs:
-              azureSubscription: "rayeez-subscription"
+              azureSubscription: "rayeez-subscription" # Service ConnectioN
               scriptType: "bash"
               scriptLocation: "inlineScript"
               inlineScript: |
@@ -166,7 +158,7 @@ stages:
   - stage: DockerBuildAndTrivyScan
     condition: and(succeeded(), eq(variables.isDev, true))
     pool:
-      name: AzureAgentPool
+      name: MicroSoftAgent
     jobs:
       - job: BuildingContainerImageAndSecurityScanning
         timeoutInMinutes: 15
@@ -174,10 +166,10 @@ stages:
           - checkout: none
           - script: docker build -t rayeez/myapp:$(Build.BuildId) .
             displayName: "Create Docker Image"
-          #- script: trivy image --severity HIGH,CRITICAL --format template --template "@template/junit.tpl" -o junit-report-high-crit.xml rayeez/myapp:$(Build.BuildId)
           - script: |
               trivy image --exit-code 0 --severity LOW,MEDIUM --format template --template "@template/junit.tpl" -o junit-report-low-med.xml rayeez/myapp:$(Build.BuildId)
               trivy image --exit-code 0 --severity HIGH,CRITICAL --format template --template "@template/junit.tpl" -o junit-report-high-crit.xml rayeez/myapp:$(Build.BuildId)
+              pwd && ls -al
             displayName: "Scan Image and Create Report"
           - task: PublishTestResults@2
             inputs:
@@ -221,7 +213,7 @@ stages:
           - checkout: none
           - task: Docker@2
             inputs:
-              containerRegistry: "devops-dockerhub-connection"
+              containerRegistry: "devops-dockerhub-connection" # Service connection name
               command: "login"
             displayName: "Login To Docker Hub"
           - task: Bash@3
@@ -234,7 +226,7 @@ stages:
   - stage: DeployDockerImageToAzureACI
     condition: and(succeeded(), eq(variables.isDev, true))
     pool:
-      name: AzureAgentPool
+      name: MicroSoftAgent
       demands:
         - JDK -equals 17
     jobs:
@@ -244,7 +236,7 @@ stages:
           - checkout: none
           - task: AzureCLI@2
             inputs:
-              azureSubscription: "rayeez-subscription"
+              azureSubscription: "rayeez-subscription" # Service connection name
               scriptType: "bash"
               scriptLocation: "inlineScript"
               inlineScript: "az container create -g ProdADO_group --name devsecopsado$(Build.BuildId) --image devsecopsacrtest.azurecr.io/devsecopsacrtest:$(Build.BuildId) --cpu 2 --memory 4 --ports 8080 --dns-name-label devsecopsado$(Build.BuildId) --registry-username devsecopsacrtest --registry-password $(acrpassword) --location eastus --os-type Linux"
@@ -254,7 +246,7 @@ stages:
     dependsOn: BuildingJavaCodeWithMavenCopyToJFrog
     condition: and(succeeded(), eq(variables.isDev, true))
     pool:
-      name: AzureAgentPool
+      name: MicroSoftAgent
     displayName: "Deploying To AWS Staging Environment"
     jobs:
       - deployment: "DeployJARtoStagingServer"
@@ -303,12 +295,12 @@ stages:
     dependsOn: BuildingJavaCodeWithMavenCopyToJFrog
     condition: and(succeeded('BuildingJavaCodeWithMavenCopyToJFrog'), eq(variables.isProd, true))
     pool:
-      name: AzureAgentPool
+      name: MicroSoftAgent
     displayName: "Deploying To AWS Prod Environment"
     jobs:
       - deployment: "DeployJARtoProdServer"
         environment:
-          name: PROD
+          name: PRODUCTION
           resourceType: VirtualMachine
         strategy:
           runOnce:
